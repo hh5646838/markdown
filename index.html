@@ -2046,8 +2046,16 @@ function hello() {
     const container = document.createElement("div");
     container.innerHTML = html;
     const rules = parseCSS(css);
+    const markerStyles = {};
     for (let i = 0; i < rules.length; i++) {
       const rule = rules[i];
+
+      // 收集 ::marker 规则（列表符号颜色等），列表 marker 文本化时使用
+      const markerMatch = rule.selector.match(/^(.*?)::?marker\s*$/i);
+      if (markerMatch) {
+        markerStyles[markerMatch[1].trim()] = rule.declarations;
+        continue;
+      }
 
       // 处理 ::before / ::after 伪元素：把 content 转成真实 span 插入 DOM
       const pseudoMatch = rule.selector.match(/^(.*?)::?(before|after)\s*$/i);
@@ -2086,7 +2094,62 @@ function hello() {
         el.setAttribute("style", newStyle);
       });
     }
+    // 列表 marker 文本化（公众号编辑器不保留原生列表符号/序号）
+    normalizeLists(container, markerStyles);
     return container.innerHTML;
+  }
+
+  // 把 ul/ol 列表转成 div 结构 + 文本 marker，保证公众号粘贴后符号、序号、内容不丢失不错乱
+  function normalizeLists(container, markerStyles) {
+    const liMarkerStyle = markerStyles[".content li"] || markerStyles[".content ul li"] || markerStyles[".content ol li"] || "";
+    const colorMatch = liMarkerStyle.match(/color\s*:\s*([^;]+)/i);
+    const markerColor = colorMatch ? colorMatch[1].trim() : "";
+
+    function processList(list) {
+      // 已脱离 DOM 的（被父级递归转换过的嵌套列表）直接跳过
+      if (!list.parentNode) return;
+      const isOl = list.tagName === "OL";
+      const listStyle = list.getAttribute("style") || "";
+      const wrap = document.createElement("div");
+      if (listStyle) wrap.setAttribute("style", listStyle);
+      let index = 1;
+      const lis = Array.prototype.slice.call(list.children);
+      lis.forEach((li) => {
+        if (li.tagName !== "LI") { wrap.appendChild(li); return; }
+        // 创建列表项 div，保留 li 的样式，禁用原生列表符号
+        const item = document.createElement("div");
+        const liStyle = li.getAttribute("style") || "";
+        item.setAttribute("style", (liStyle ? liStyle + "; " : "") + "list-style: none;");
+        // marker 文本 span
+        const marker = document.createElement("span");
+        marker.textContent = isOl ? (index + ". ") : "• ";
+        if (markerColor) marker.style.color = markerColor;
+        if (isOl) marker.style.fontWeight = "600";
+        // marker 必须与列表项首行内容同行：若首个块级子元素是 p/div，插到其内部开头
+        // 注意：必须在递归转换嵌套列表之前判断，否则 firstElementChild 会变成转换后的嵌套 div
+        const firstChild = li.firstElementChild;
+        if (firstChild && (firstChild.tagName === "P" || firstChild.tagName === "DIV")) {
+          firstChild.insertBefore(marker, firstChild.firstChild);
+        } else {
+          item.appendChild(marker);
+        }
+        // 再递归转换 li 内的嵌套列表（原地替换为 div）
+        const nested = li.querySelectorAll("ul, ol");
+        Array.prototype.forEach.call(nested, nl => processList(nl));
+        // 搬移 li 其余内容
+        while (li.firstChild) item.appendChild(li.firstChild);
+        wrap.appendChild(item);
+        index++;
+      });
+      list.parentNode.replaceChild(wrap, list);
+    }
+
+    const lists = container.querySelectorAll("ul, ol");
+    Array.prototype.forEach.call(lists, (list) => {
+      // 只处理顶层列表（父级不是 li），嵌套列表由递归处理；已脱离 DOM 的由 processList 内部跳过
+      const parent = list.parentElement;
+      if (!parent || parent.tagName !== "LI") processList(list);
+    });
   }
   function showToast(msg) {
     toast.textContent = msg;
