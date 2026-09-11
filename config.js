@@ -198,7 +198,7 @@ window.PRESET_THEMES = {
 .content blockquote p { display: inline; margin: 0; }
 .content code { background: #dfe6e9; color: #d63031; padding: 2px 6px; border-radius: 3px; font-size: 13px; font-family: "SFMono-Regular", Consolas, monospace; }
 .content pre { background: #1e272e; color: #00b894; padding: 16px; border-radius: 6px; overflow-x: auto; margin: 16px 0; border: 1px solid #2d3436; }
-.content pre::before { content: "output:"; display: block; color: #636e72; font-size: 11px; margin-bottom: 8px; text-transform: uppercase; }
+
 .content pre code { background: none; color: inherit; padding: 0; }
 .content a { color: #0984e3; text-decoration: none; border-bottom: 1px dashed #0984e3; }
 .content img { max-width: 100%; border-radius: 4px; display: block; margin: 16px auto; border: 1px solid #dfe6e9; }
